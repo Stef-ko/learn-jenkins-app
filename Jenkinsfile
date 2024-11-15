@@ -10,6 +10,7 @@ pipeline {
                 }
             }
             steps {
+                echo 'Build stage'
                 sh '''
                     ls -la
                     node --version
@@ -28,6 +29,7 @@ pipeline {
                 }
             }
             steps {
+                echo 'Test stage'
                 sh '''
                     ls -la
                     test -f build/index.html
