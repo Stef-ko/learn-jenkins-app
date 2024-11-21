@@ -94,12 +94,38 @@ pipeline {
                     node_modules/.bin/node-jq -r '.deploy_url' deploy-output.json
                 '''
             }
+            script {
+                env.STAGING_URL = sh(script: "node_modules/.bin/node-jq -r '.deploy_url' deploy-output.json", returnStdout: true)
+            }
         }
 
         stage('Approval') {
             steps {
                 timeout(time: 1, unit: 'MINUTES') {
                     input message: 'Ready to deploy?', ok: 'Yes, I am sure I want to deploy'
+                }
+            }
+        }
+
+        stage('Staging E2E'){
+            agent {
+                docker {
+                    image 'mcr.microsoft.com/playwright:v1.39.0-jammy'
+                    reuseNode true
+                }
+            }
+            environment {
+                CI_ENVIRONMENT_URL = "${env.STAGING_URL}"
+            }
+            steps {
+                echo 'Test stage'
+                sh '''
+                    npx playwright test --reporter=line
+                '''
+            }
+            post {
+                always {
+                    publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: 'playwright-report', reportFiles: 'index.html', reportName: 'Staging E2E Report', reportTitles: '', useWrapperFileDirectly: true])
                 }
             }
         }
@@ -125,26 +151,26 @@ pipeline {
         }
 
         stage('Prod E2E'){
-                    agent {
-                        docker {
-                            image 'mcr.microsoft.com/playwright:v1.39.0-jammy'
-                            reuseNode true
-                        }
-                    }
-                    environment {
-                        CI_ENVIRONMENT_URL = 'https://kaleidoscopic-gnome-abfb63.netlify.app'
-                    }
-                    steps {
-                        echo 'Test stage'
-                        sh '''
-                            npx playwright test --reporter=line
-                        '''
-                    }
-                    post {
-                        always {
-                            publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: 'playwright-report', reportFiles: 'index.html', reportName: 'Playwright E2E Report', reportTitles: '', useWrapperFileDirectly: true])
-                        }
-                    }
+            agent {
+                docker {
+                    image 'mcr.microsoft.com/playwright:v1.39.0-jammy'
+                    reuseNode true
                 }
+            }
+            environment {
+                CI_ENVIRONMENT_URL = 'https://kaleidoscopic-gnome-abfb63.netlify.app'
+            }
+            steps {
+                echo 'Test stage'
+                sh '''
+                    npx playwright test --reporter=line
+                '''
+            }
+            post {
+                always {
+                    publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: 'playwright-report', reportFiles: 'index.html', reportName: 'Prod E2E Report', reportTitles: '', useWrapperFileDirectly: true])
+                }
+            }
+        }
     }
 }
